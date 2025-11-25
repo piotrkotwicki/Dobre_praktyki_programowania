@@ -104,7 +104,7 @@ def get_db():
 
 @app.get("/")
 def root():
-    return {"hello": "this is my database application"}
+    return {"hello, this is my database application"}
 
 
 def to_dict(obj):
@@ -126,8 +126,8 @@ def get_links(db: Session = Depends(get_db)):
 
 
 @app.get("/ratings")
-def get_ratings(limit: int = 100, db: Session = Depends(get_db)):
-    ratings = db.query(Rating).limit(limit).all()
+def get_ratings(db: Session = Depends(get_db)):
+    ratings = db.query(Rating).all()
     return [to_dict(r) for r in ratings]
 
 
