@@ -7,6 +7,11 @@ import models
 import schemas
 import auth
 from database import engine, get_db
+import cv2
+import cvlib as cv
+import numpy as np
+import requests
+from cvlib.object_detection import draw_bbox
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -164,3 +169,42 @@ def delete_tag(id: int, db: Session = Depends(get_db)):
     db_item = get_object_or_404(db, models.Tag, id)
     db.delete(db_item)
     db.commit()
+
+    @app.get("/analyze_img")
+    def analyze_image_endpoint(image_url: str):
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+            }
+
+            try:
+                response = requests.get(image_url, headers=headers, timeout=10)
+            except requests.exceptions.RequestException as e:
+                raise HTTPException(status_code=400, detail=f"Błąd połączenia: {str(e)}")
+
+            if response.status_code != 200:
+                raise HTTPException(status_code=400,
+                                    detail=f"Nie udało się pobrać zdjęcia. Status serwera: {response.status_code}")
+
+            image_array = np.asarray(bytearray(response.content), dtype=np.uint8)
+            img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+
+            if img is None:
+                raise HTTPException(status_code=400, detail="To nie jest poprawny plik obrazu.")
+
+            bbox, label, conf = cv.detect_common_objects(img)
+
+            person_count = label.count('person')
+
+            return {
+                "image_url": image_url,
+                "person_count": person_count,
+                "all_detected_objects": label
+            }
+
+        except HTTPException as e:
+            raise e
+
+        except Exception as e:
+            print(f"CRITICAL ERROR: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
